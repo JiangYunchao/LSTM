@@ -1,5 +1,7 @@
 #-*- coding:utf-8-*-
 import sys
+reload(sys)
+sys.setdefaultencoding('utf-8')
 sys.path.insert(0, '/home/jiang/polyvore_Bi-LSTM')
 from utils.data_utils import load_pkl
 from utils.data_utils import DataFile
@@ -15,8 +17,8 @@ tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
 
 class preprocess_text:
 
-    def __init__(self):
-        self.state = None  #train, val, test
+    def __init__(self, state):
+        self.state = state  #train, val, test
 
     # def create_vocab(self, filename):
     #     """Creates the vocabulary of word to word_id.
@@ -30,8 +32,7 @@ class preprocess_text:
     #
     #     return vocab
 
-    def load_data(self, state):
-        self.state = state
+    def load_data(self):
         datafile = DataFile('/data/polyvore/processed/tuples',
                             '/data/polyvore/processed/image_list')
         image_list = datafile.image_list
@@ -49,6 +50,7 @@ class preprocess_text:
             for j in range(1, 4):
                 single_item = {}
                 single_item["index"] = j
+                single_item["id"] = tpl[j]
                 image_name = image_list[j - 1][tpl[j]]
                 single_item["imgname"] = image_name
                 item_info = fashion_items[image_name]
@@ -83,39 +85,39 @@ class preprocess_text:
                     for sentence in item["text"]:
                         sentence = self.process_word(sentence)
                         words = list(set(WordPunctTokenizer().tokenize(sentence)))
-                        vocab = vocab + words
-        vocab_final = list(set(vocab))
-        vocab_final = special_words + vocab_final
+                        vocab += words
+        vocab = list(set(vocab))
+        vocab_final = special_words + vocab
 
-        with open ('/Baseline/process_for_skipThought/textvocab.txt', 'w') as f:
+        with open ('vocab.txt', 'w') as f:
             for word in vocab_final:
                 f.write(word + '\n')
             print("Vocab Write Down Finished...")
 
 
-    def get_text(self, all_sets):
+    def get_text(self, all_sets, set_tuple):
         des = []
         for sets in all_sets:
             username = sets['username']
-            for item in sets:
+            for item in sets["item"]:
                 if item["text"]:
                     index = item['index']
-                    text = username + "/" + index + "/"
+                    text = str(username) + "/" + str(index) + "/" + str(item["id"]) + "/"
                     for sentence in item["text"]:
                         sentence = self.process_word(sentence)
                         text += sentence + '\t'
                     des.append(text)
                     
-        with open ('/Baseline/process_for_skipThought/data.txt', 'w') as f:
+        with open ('data_' + self.state + '.txt', 'w') as f:
             for record in des:
                 f.write(record + '\n')
             print("Text Write Down Finished...")
 
 if __name__ == ('__main__'):
-    a = preprocess_text()
-    image_list, positive_tuple, negative_tuples, fashion_items = a.load_data("train")
+    a = preprocess_text("train")
+    image_list, positive_tuple, negative_tuples, fashion_items = a.load_data()
     all_sets = a.set_dic(positive_tuple, image_list, fashion_items)
     a.get_vocab(all_sets)
-    a.get_text(all_sets)
+    a.get_text(all_sets, positive_tuple)
     
     
