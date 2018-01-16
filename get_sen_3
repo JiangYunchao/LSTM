@@ -1,0 +1,28 @@
+f = open('data_train.txt', 'r')
+text = f.read()
+f.close()
+item_list = text.split('\n')
+for item in item_list:
+    temp = item.split('/', 3)
+    try:
+        sens = temp[-1]
+        username = temp[0]
+        category = temp[1]
+        item_id = temp[2]
+        sen_list = sens.split('\t')
+        if len(sen_list) < 3: 
+            continue
+        elif len(sen_list) == 3:
+            with open('sentence/' + username + '_' + category + '_' + item_id + '.txt', 'w') as f:
+                for i in sen_list:
+                    f.write(i + '\n')
+        else:
+            start = 0
+            for _ in range(0, len(sen_list)-2):
+                with open('sentence/' + username + '_' + category + '_' + item_id + '_' + str(start) +  '.txt', 'w') as f:
+                    f.write(sen_list[start] + '\n')
+                    f.write(sen_list[start+1] + '\n')
+                    f.write(sen_list[start+2] + '\n')
+                    start += 1
+    except:
+        pass
