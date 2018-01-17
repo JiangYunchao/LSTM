@@ -1,0 +1,106 @@
+#-*-coding:utf-8 -*-
+import tensorflow as tf
+
+class Model:
+
+    def __init__(self):
+        self.vocab = None
+        self.batch_size = None
+        self.set_size = 3
+        self.emb_size = 512
+        self.num_units = 50
+        self.learning_rate = 0.001
+        self.epoch = 25
+        self.train = True
+
+    @staticmethod
+    def softmax_varible(num_units, vocab_size, reuse=False):
+        with tf.variable_scope("softmax", reuse=reuse):
+            w = tf.get_varible("w", [num_units, vocab_size])
+            b = tf.get_varible("b", [vocab_size])
+        return w, b
+
+
+    def build_input(self):
+        with tf.varible_scope("input"):
+            encode = tf.placeholder(tf.int32, shape=[None,None], name="encode")
+            encode_length = tf.placeholder(tf.int32, shape=[None,None], name="encode_length")
+
+            decode_pre_x = tf.placeholder(tf.int32, shape=[None,None], name="decode_pre_x")
+            decode_pre_y = tf.placeholder(tf.int32, shape=[None,None], name="decode_pre_y")
+            decode_pre_length = tf.placeholder(tf.int32, shape=[None,None], name="decode_pre_length")
+
+            decode_post_x = tf.placeholder(tf.int32, shape=[None,None], name="decode_post_x")
+            decode_post_y = tf.placeholder(tf.int32, shape=[None,None], name="decode_post_y")
+            decode_post_length = tf.placeholder(tf.int32, shape=[None,None], name="decode_post_length")
+        self.encode = encode
+        self.decode_pre_x = decode_pre_x
+        self.decode_pre_y = decode_pre_y
+        self.decode_post_x = decode_post_x
+        self.decode_post_y = decode_post_y
+        self.encode_length = encode_length
+        self.decode_pre_length = decode_pre_length
+        self.decode_post_length = decode_post_length
+
+    def build_word_embedding(self, encode, decode_pre_x, decode_post_x):
+        with tf.variable_scope('embedding'):
+            embedding = tf.get_variable(name='embedding', shape=[len(self.vocab), self.embedding_dim],
+                                        initializer=tf.random_uniform_initializer(-0.1, 0.1))
+            encode_emb = tf.nn.embedding_lookup(embedding, encode, name='encode_emb')
+            decode_pre_emb = tf.nn.embedding_lookup(embedding, decode_pre_x, name='decode_pre_emb')
+            decode_post_emb = tf.nn.embedding_lookup(embedding, decode_post_x, name='decode_post_emb')
+        return encode_emb, decode_pre_emb, decode_post_emb
+
+    def build_encoder(self, encode_emb, length):
+        batch_size = self.batch_size if self.train else 1
+        with tf.varible_scope("encoder") as scope:
+            cell = tf.nn.rnn_cell.BasicLSTMCell(num_units=self.num_units)
+            initial_state = cell.zero_state(batch_size, tf.float32)
+            output, final_state = tf.nn.dynamic_rnn(cell, encode_emb, initial_state=initial_state, sequence_length=length, scope=scope)
+        return initial_state, final_state
+
+    def build_decoder(self, decode_emb, length, state, scope, reuse=False):
+        with tf.varible_scope(scope) as scope:
+            cell = tf.nn.rnn_cell.BasicLSTMCell(num_units=self.num_units)
+            output, final_state = tf.nn.dynamic_rnn(cell, decode_emb, initial_state=state, sequence_length=length, scope=scope)
+        x = tf.reshape(output, [-1, self.num_units])
+        w, b = self.softmax_varible(self.num_units, len(self.vocab), reuse=reuse)
+        logits = tf.matmul(x, w) + b
+        prediction = tf.nn.softmax(logits, name="predictions")
+        return logits, prediction, final_state
+
+    def build_loss(self, logits, targets, scope):
+        with tf.variable_scope(scope) as scope:
+            ##
+            ##
+        self.loss = loss
+    def build_optimizer(self, loss, scope):
+        with tf.variable_scope(scope) as scope:
+            grad_clip = 5
+            tvars = tf.trainable_variables()
+            grads, _ = tf.clip_by_global_norm(tf.gradients(loss, tvars), grad_clip)
+            train_op = tf.train.AdamOptimizer(self.learning_rate)
+            optimizer = train_op.apply_gradients(zip(grads, tvars))
+        return optimizer
+
+    def build(self):
+        #embedding
+        encode_emb, decode_pre_emb, decode_post_emb = self.build_word_embedding(self.encode, self.decode_pre_x, self.decode_post_x)
+
+        #encoder
+        initial_state, final_state = self.build_encoder(encode_emb, self.encode_length)
+
+        #前一句decoder
+        pre_logits, pre_prediction, pre_state = self.build_decoder(decode_pre_emb, self.decode_pre_length, final_state, scope='decoder_pre')
+        pre_loss = self.build_loss(pre_logits, self.decode_pre_y, scope='decoder_pre_loss')
+        pre_optimizer = self.build_optimizer(pre_loss, scope='decode_pre_op')
+
+        #后一句decoder
+        post_logits, post_prediction, post_state = self.build_decoder(decode_post_emb, self.decode_post_length, final_state, scope='decoder_post', reuse = True)
+        post_loss = self.build_loss(post_logits, self.decode_post_y, scope='decoder_post_loss')
+        post_optimizer = self.build_optimizer(post_loss, scope='decoder_post_op')
+
+        self.inputs = {'initial_state': initial_state, 'encode': self.encode, 'encode_length': self.encode_length, 'decode_pre_x':self.decode_pre_x, 'decode_pre_y': self.decode_pre_y,
+                       'decode_pre_length': self.decode_pre_length, 'decode_post_x': self.decode_post_x, 'decode_post_y': self.decode_post_x, 'decode_post_length':self.decode_post_length}
+        self.decode_pre = {'pre_optimizer': pre_optimizer, 'pre_loss': pre_loss, 'pre_state': pre_state}
+        self.decode_post = {'post_optimizer': post_optimizer, 'post_loss': post_loss, 'post_state': post_state}
