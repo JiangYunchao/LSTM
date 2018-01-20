@@ -1,0 +1,17 @@
+Linux服务器上创建账户用到useradd命名，一般常用以下命令：
+
+useradd -m -s /bin/bash userName
+
+passwd userName
+//设置密码，输入此命令后会提示你输入密码
+删除用户
+
+userdel -r userName
+切换用户
+
+su - youruser
+
+作者：WonderChang
+链接：https://www.jianshu.com/p/093199964d5b
+來源：简书
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
